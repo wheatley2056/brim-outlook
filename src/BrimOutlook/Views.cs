@@ -145,7 +145,10 @@ public static class Views
         },
     ]);
 
-    // ───────── Aktivitäten ─────────
+    // ───────── Aktivität ─────────
+
+    /// <summary>Höchster Rang, den Brim Plugins erlaubt; damit steht Outlook im Tab „Jetzt“ vor Akku, Kamera usw.</summary>
+    public const int Rank = 9;
 
     /// <summary>Der Termin, der jetzt in die Notch gehört: beginnt innerhalb von <paramref name="lead"/> oder hat gerade begonnen.</summary>
     public static MeetingSummary? UpcomingMeeting(OutlookSnapshot snapshot, DateTime now, TimeSpan lead) =>
@@ -154,112 +157,88 @@ public static class Views
             .OrderBy(m => m.Start)
             .FirstOrDefault();
 
-    public static ActivityParams MeetingActivity(MeetingSummary meeting, DateTime now, ActionKeys keys)
+    /// <summary>
+    /// Eine Aktivität für alles: im Tab „Jetzt“ eine scrollbare Liste mit Termin, Kalender, Posteingang und
+    /// Aufgaben. Kompakt erscheint sie nur, wenn ein Termin ansteht (Countdown) oder der Nutzer die ungelesenen
+    /// E-Mails dort sehen will; sonst bleibt sie im Hintergrund.
+    /// </summary>
+    public static ActivityParams OutlookActivity(OutlookSnapshot snapshot, DateTime now, PluginSettings settings, ActionKeys keys)
     {
-        var countdown = Format.Countdown(meeting.Start, now);
-        var started = meeting.Start <= now;
-        var color = started ? BrimColors.Charge : Accent;
-        var key = keys.For(meeting.Ref);
-
-        var actions = new List<Widget>();
-        if (meeting.JoinLink is not null)
+        var meeting = settings.MeetingActivity ? UpcomingMeeting(snapshot, now, settings.MeetingLead) : null;
+        var items = new List<Widget>();
+        if (meeting is not null)
         {
-            actions.Add(new ButtonWidget($"join:{key}") { Kind = ButtonKind.Secondary, Glyph = Icons.Video, Label = "Beitreten" });
+            items.Add(MeetingCard(meeting, now, keys));
         }
-        actions.Add(new ButtonWidget($"open:{key}") { Kind = ButtonKind.Secondary, Label = "Öffnen" });
+        items.Add(CalendarCard(snapshot, now, settings.MaxItems, keys));
+        items.Add(MailCard(snapshot, now, settings.MaxItems, keys));
+        items.Add(TasksCard(snapshot, now, settings.MaxItems, keys));
+        var expanded = new ListWidget(items) { Spacing = 8, Scrollable = true };
 
-        var details = Format.TimeRange(meeting) + (meeting.Location is { Length: > 0 } location ? " · " + Format.Clip(location, 80) : "");
+        if (meeting is not null)
+        {
+            var countdown = Format.Countdown(meeting.Start, now);
+            var color = meeting.Start <= now ? BrimColors.Charge : Accent;
+            return new ActivityParams
+            {
+                Id = ActivityId,
+                Rank = Rank,
+                Accent = Accent,
+                Leading = new IconWidget(Glyphs.Calendar) { Size = 14, Color = color },
+                Trailing = new TextWidget(countdown) { Style = TextStyle.Caption, FontSize = 12, Color = color },
+                Bead = new IconWidget(Glyphs.Calendar) { Size = 8, Color = color },
+                Expanded = expanded,
+                Announcement = $"{Format.Clip(meeting.Subject, 120)} {countdown}",
+            };
+        }
         return new ActivityParams
         {
-            Id = "meeting",
-            Rank = 6,
+            Id = ActivityId,
+            Rank = Rank,
+            Background = !(settings.ShowUnreadInNotch && snapshot.UnreadCount > 0),
             Accent = Accent,
-            Leading = new IconWidget(Glyphs.Calendar) { Size = 14, Color = color },
-            Trailing = new TextWidget(countdown) { Style = TextStyle.Caption, FontSize = 12, Color = color },
-            Bead = new IconWidget(Glyphs.Calendar) { Size = 8, Color = color },
-            Expanded = new StackWidget(
-                new StackWidget(
-                    new IconWidget(Glyphs.Calendar) { Size = 16, Color = color },
-                    new TextWidget(Format.Clip(meeting.Subject, 120)) { Style = TextStyle.Title, Grow = 1 },
-                    new TextWidget(countdown) { Style = TextStyle.Mono, Color = color })
-                {
-                    Spacing = 8,
-                },
-                new TextWidget(details) { Style = TextStyle.Secondary },
-                new StackWidget(actions) { Spacing = 8 })
-            {
-                Orientation = StackOrientation.Vertical,
-                Spacing = 8,
-                Align = CrossAlign.Stretch,
-            },
-            Announcement = $"{Format.Clip(meeting.Subject, 120)} {countdown}",
+            Leading = new IconWidget(Icons.Mail) { Size = 14, Color = Accent },
+            Trailing = new TextWidget(snapshot.UnreadCount.ToString()) { Style = TextStyle.Mono, FontSize = 12 },
+            Bead = new IconWidget(Icons.Mail) { Size = 8, Color = Accent },
+            Expanded = expanded,
         };
     }
 
-    /// <summary>Ungelesene E-Mails; im Tab „Jetzt“ immer, kompakt nur, wenn der Nutzer das will.</summary>
-    public static ActivityParams MailActivity(OutlookSnapshot snapshot, DateTime now, bool compact) => new()
+    /// <summary>Solange Outlook nicht erreichbar ist: Hinweis im Tab „Jetzt“, nichts in der kompakten Notch.</summary>
+    public static ActivityParams UnavailableActivity(string reason) => new()
     {
-        Id = "mail",
-        Rank = 3,
-        Background = !compact,
-        Accent = Accent,
-        Leading = new IconWidget(Icons.Mail) { Size = 14, Color = Accent },
-        Trailing = new TextWidget(snapshot.UnreadCount.ToString()) { Style = TextStyle.Mono, FontSize = 12 },
-        Bead = new IconWidget(Icons.Mail) { Size = 8, Color = Accent },
-        Expanded = Summary(Icons.Mail, Format.Unread(snapshot.UnreadCount),
-            snapshot.Mails.Take(3).Select(m => new SummaryLine(m.Sender, m.Subject, Format.Received(m.Received, now), null))),
+        Id = ActivityId,
+        Rank = Rank,
+        Background = true,
+        Leading = new IconWidget(Icons.Mail) { Size = 14, Color = BrimColors.Slate },
+        Trailing = new TextWidget("aus") { Style = TextStyle.Caption, FontSize = 12 },
+        Expanded = new ListWidget([UnavailableCard(reason)]) { Spacing = 8, Scrollable = true },
     };
 
-    /// <summary>Überfällige und heute fällige Aufgaben im Tab „Jetzt“; <c>null</c>, wenn keine drängt.</summary>
-    public static ActivityParams? TasksActivity(OutlookSnapshot snapshot, DateTime now)
+    public const string ActivityId = "outlook";
+
+    /// <summary>Der anstehende Termin groß, mit Countdown und „Beitreten“.</summary>
+    private static Widget MeetingCard(MeetingSummary meeting, DateTime now, ActionKeys keys)
     {
-        var urgent = snapshot.Tasks.Where(t => t.IsOverdue(now) || t.IsDueToday(now)).ToList();
-        if (urgent.Count == 0)
+        var countdown = Format.Countdown(meeting.Start, now);
+        var color = meeting.Start <= now ? BrimColors.Charge : Accent;
+        var key = keys.For(meeting.Ref);
+        var children = new List<Widget>
         {
-            return null;
-        }
-        var overdue = urgent.Count(t => t.IsOverdue(now));
-        var color = overdue > 0 ? BrimColors.Danger : BrimColors.Warning;
-        var title = urgent.Count == 1 ? "1 Aufgabe fällig" : $"{urgent.Count} Aufgaben fällig";
-        return new ActivityParams
-        {
-            Id = "tasks",
-            Rank = 2,
-            Background = true,
-            Leading = new IconWidget(Icons.Tasks) { Size = 14, Color = color },
-            Trailing = new TextWidget(urgent.Count.ToString()) { Style = TextStyle.Mono, FontSize = 12, Color = color },
-            Bead = new IconWidget(Icons.Tasks) { Size = 8, Color = color },
-            Expanded = Summary(Icons.Tasks, title,
-                urgent.Take(3).Select(t => new SummaryLine(t.Subject, null, Format.Due(t.Due, now), t.IsOverdue(now) ? BrimColors.Danger : BrimColors.Warning))),
+            new IconWidget(Glyphs.Calendar) { Size = 18, Color = color },
+            TwoLines(Format.Clip(meeting.Subject, 120),
+                Format.TimeRange(meeting) + (meeting.Location is { Length: > 0 } location ? " · " + Format.Clip(location, 80) : "")),
+            new TextWidget(countdown) { Style = TextStyle.Mono, Color = color },
         };
+        if (meeting.JoinLink is not null)
+        {
+            children.Add(new ButtonWidget($"join:{key}") { Kind = ButtonKind.Secondary, Glyph = Icons.Video, Label = "Beitreten" });
+        }
+        children.Add(SmallButton($"open:{key}", Glyphs.OpenInNew, "In Outlook öffnen"));
+        return Card([Row(children)]);
     }
 
     // ───────── Bausteine ─────────
-
-    private sealed record SummaryLine(string Line, string? Detail, string Trailing, string? TrailingColor);
-
-    private static Widget Summary(string glyph, string title, IEnumerable<SummaryLine> items)
-    {
-        var rows = new List<Widget>
-        {
-            new StackWidget(
-                new IconWidget(glyph) { Size = 16, Color = Accent },
-                new TextWidget(title) { Style = TextStyle.Title, Grow = 1 })
-            {
-                Spacing = 8,
-            },
-        };
-        foreach (var (line, detail, trailing, trailingColor) in items)
-        {
-            rows.Add(new StackWidget(
-                TwoLines(line, detail),
-                new TextWidget(trailing) { Style = TextStyle.MonoCaption, Color = trailingColor })
-            {
-                Spacing = 8,
-            });
-        }
-        return new StackWidget(rows) { Orientation = StackOrientation.Vertical, Spacing = 8, Align = CrossAlign.Stretch };
-    }
 
     private static Widget Header(string glyph, string title, string? badge, OutlookKind kind, string newLabel)
     {

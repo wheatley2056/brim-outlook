@@ -4,12 +4,13 @@ Plugin für [Brim](https://github.com/wheatley2056/brim), die Notch für Windows
 
 | Wo | Was |
 |---|---|
-| **Notch, kompakt** | Der nächste Termin erscheint 15 Minuten vorher mit Countdown („in 12 min“) und bleibt bis 5 Minuten nach Beginn. Zu Beginn kurz als HUD: „Teamrunde beginnt jetzt“. |
-| **Tab „Jetzt“** | Termin mit **Beitreten** (Teams, Zoom, Google Meet, Webex), ungelesene E-Mails, heute fällige und überfällige Aufgaben. |
-| **Tab „Plugins“** | Drei Karten: **Heute** (bzw. **Morgen**, wenn heute nichts mehr ansteht), **Posteingang**, **Aufgaben**. Jeweils öffnen, neu anlegen, als gelesen bzw. erledigt markieren, Ordner in Outlook zeigen. |
+| **Tab „Jetzt“** | Alles in einer scrollbaren Liste: der anstehende Termin groß mit **Beitreten** (Teams, Zoom, Google Meet, Webex), dann **Heute** (bzw. **Morgen**, wenn heute nichts mehr ansteht), **Posteingang** und **Aufgaben**. Jeweils öffnen, neu anlegen, als gelesen bzw. erledigt markieren, Ordner in Outlook zeigen. |
+| **Notch, kompakt** | Der nächste Termin erscheint 15 Minuten vorher mit Countdown („in 12 min“) und bleibt bis 5 Minuten nach Beginn. Zu Beginn kurz als HUD: „Teamrunde beginnt jetzt“. Sonst bleibt die kompakte Notch frei. |
 | **HUD** | Neue E-Mail: „Anna Müller: Angebot Q4“. |
 
-Läuft Outlook nicht, zeigt die Karte das an, mit **Outlook starten**.
+Brim zeigt im Tab „Jetzt“ die laufende Aktivität mit dem höchsten Rang. Das Plugin nimmt den höchsten, den Brim Plugins erlaubt (9), und steht damit vor Akku, Kamera und pausierter Musik. **Läuft Musik oder ein Timer, zeigt „Jetzt“ diese**, bis sie pausiert bzw. abgelaufen sind.
+
+Läuft Outlook nicht, steht das im Tab „Jetzt“, mit **Outlook starten**.
 
 ## Voraussetzungen
 
@@ -40,8 +41,8 @@ In Brims `settings.json` unter `Plugins.de.brim.outlook.Values`:
 |---|---|---|
 | `refreshSeconds` | `30` | Outlook so oft abfragen (10–600 s). Der Countdown läuft unabhängig davon alle 15 s. |
 | `meetingLeadMinutes` | `15` | So viele Minuten vor Beginn erscheint ein Termin in der Notch. |
-| `maxItems` | `5` | Einträge pro Karte (1–10). |
-| `showUnreadInNotch` | `false` | Anzahl ungelesener E-Mails auch kompakt in der Notch zeigen (sonst nur im Tab „Jetzt“). |
+| `maxItems` | `10` | Einträge pro Abschnitt (1–12; mehr passt nicht in Brims Grenze von 400 Bausteinen pro Nachricht). |
+| `showUnreadInNotch` | `false` | Anzahl ungelesener E-Mails kompakt in der Notch zeigen, solange kein Termin ansteht. |
 | `mailHud` | `true` | Neue E-Mails als HUD melden. |
 | `meetingActivity` | `true` | Termin-Countdown in der Notch. Aus, wenn Brims eingebauter Kalender dieselben Termine schon zeigt (z. B. weil das Konto auch im Windows-Kalender steckt). |
 
@@ -61,11 +62,11 @@ Nichts davon verlässt den Rechner; das Plugin schickt nur die angezeigten Texte
 src/BrimOutlook/
   Program.cs              Verbindung zu Brim (Brim.Sdk), Ereignisse verdrahten
   OutlookPlugin.cs        Abfrage-Schleife, Aktionen, neue E-Mails, schickt nur Änderungen
-  Views.cs                Karten und Aktivitäten als Widgets (reine Funktionen)
+  Views.cs                Abschnitte und die Aktivität für „Jetzt“ als Widgets (reine Funktionen)
   Outlook/                Modell, Schnittstelle IOutlookSource, Links und Zeitangaben
   Com/                    Outlook über COM: eigener STA-Thread, Nachrichtenfilter für „Outlook ist beschäftigt“
 external/brim             Brim als Submodul (für Brim.Sdk)
-tests/BrimOutlook.Tests   xUnit; prüft u. a. jede Karte mit Brims WidgetValidator
+tests/BrimOutlook.Tests   xUnit; prüft u. a. alles Gesendete mit Brims WidgetValidator
 ```
 
 Entwickeln und testen geht auch ohne Windows (`dotnet test`); nur `Com/` braucht Outlook.

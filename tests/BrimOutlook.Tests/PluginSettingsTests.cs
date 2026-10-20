@@ -12,7 +12,7 @@ public class PluginSettingsTests
         var settings = PluginSettings.From(values);
         Assert.Equal(TimeSpan.FromSeconds(45), settings.Refresh);
         Assert.Equal(TimeSpan.FromMinutes(10), settings.MeetingLead);
-        Assert.Equal(10, settings.MaxItems); // begrenzt
+        Assert.Equal(12, settings.MaxItems); // begrenzt
         Assert.True(settings.ShowUnreadInNotch);
         Assert.False(settings.MailHud);
         Assert.True(settings.MeetingActivity);

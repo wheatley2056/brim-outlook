@@ -8,7 +8,7 @@ public sealed record PluginSettings
 {
     public TimeSpan Refresh { get; init; } = TimeSpan.FromSeconds(30);
     public TimeSpan MeetingLead { get; init; } = TimeSpan.FromMinutes(15);
-    public int MaxItems { get; init; } = 5;
+    public int MaxItems { get; init; } = 10;
     public bool ShowUnreadInNotch { get; init; }
     public bool MailHud { get; init; } = true;
     public bool MeetingActivity { get; init; } = true;
@@ -20,7 +20,8 @@ public sealed record PluginSettings
         {
             Refresh = TimeSpan.FromSeconds(Number(values, "refreshSeconds", defaults.Refresh.TotalSeconds, 10, 600)),
             MeetingLead = TimeSpan.FromMinutes(Number(values, "meetingLeadMinutes", defaults.MeetingLead.TotalMinutes, 1, 120)),
-            MaxItems = (int)Number(values, "maxItems", defaults.MaxItems, 1, 10),
+            // Höchstens 12, damit die Liste unter Brims Grenze von 400 Bausteinen pro Nachricht bleibt.
+            MaxItems = (int)Number(values, "maxItems", defaults.MaxItems, 1, 12),
             ShowUnreadInNotch = Flag(values, "showUnreadInNotch", defaults.ShowUnreadInNotch),
             MailHud = Flag(values, "mailHud", defaults.MailHud),
             MeetingActivity = Flag(values, "meetingActivity", defaults.MeetingActivity),

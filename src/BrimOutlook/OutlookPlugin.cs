@@ -6,20 +6,13 @@ using BrimOutlook.Outlook;
 namespace BrimOutlook;
 
 /// <summary>
-/// Liest Outlook in festen Abständen, zeigt Karten im Tab „Plugins“, Termine mit Countdown in der Notch und
-/// kurze Meldungen bei neuen E-Mails. Schickt nur, was sich geändert hat.
+/// Liest Outlook in festen Abständen und zeigt alles im Tab „Jetzt“ (scrollbar), den nächsten Termin mit
+/// Countdown in der kompakten Notch und kurze Meldungen bei neuen E-Mails. Schickt nur, was sich geändert hat.
 /// </summary>
 public sealed class OutlookPlugin
 {
     /// <summary>So oft wird neu gezeichnet (Countdown); gelesen wird nach <see cref="PluginSettings.Refresh"/>.</summary>
     public static readonly TimeSpan Tick = TimeSpan.FromSeconds(15);
-
-    public const string MailView = "mail";
-    public const string CalendarView = "calendar";
-    public const string TasksView = "tasks";
-    public const string UnavailableView = "outlook";
-
-    private static readonly string[] ActivityIds = ["meeting", "mail", "tasks"];
 
     private readonly INotchSink _sink;
     private readonly IOutlookSource _source;
@@ -27,7 +20,6 @@ public sealed class OutlookPlugin
     private readonly Func<Uri, Task> _openUrl;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly ActionKeys _keys = new();
-    private readonly Dictionary<string, string> _views = [];
     private readonly Dictionary<string, string> _activities = [];
     private readonly HashSet<ItemRef> _announced = [];
 
@@ -205,15 +197,7 @@ public sealed class OutlookPlugin
     {
         if (_unavailable is not null)
         {
-            await SetViewAsync(UnavailableView, Views.UnavailableCard(_unavailable), 20);
-            foreach (var id in new[] { CalendarView, MailView, TasksView })
-            {
-                await ClearViewAsync(id);
-            }
-            foreach (var id in ActivityIds)
-            {
-                await EndActivityAsync(id);
-            }
+            await SetActivityAsync(Views.UnavailableActivity(_unavailable));
             return;
         }
         if (_snapshot is not { } snapshot)
@@ -221,45 +205,16 @@ public sealed class OutlookPlugin
             return;
         }
 
-        await ClearViewAsync(UnavailableView);
-        await SetViewAsync(CalendarView, Views.CalendarCard(snapshot, now, Settings.MaxItems, _keys), 20);
-        await SetViewAsync(MailView, Views.MailCard(snapshot, now, Settings.MaxItems, _keys), 21);
-        await SetViewAsync(TasksView, Views.TasksCard(snapshot, now, Settings.MaxItems, _keys), 22);
+        await SetActivityAsync(Views.OutlookActivity(snapshot, now, Settings, _keys));
 
         var meeting = Settings.MeetingActivity ? Views.UpcomingMeeting(snapshot, now, Settings.MeetingLead) : null;
-        if (meeting is null)
+        if (meeting is not null && meeting.Start <= now && now - meeting.Start < TimeSpan.FromMinutes(1) && _announced.Add(meeting.Ref))
         {
-            await EndActivityAsync("meeting");
-        }
-        else
-        {
-            await SetActivityAsync(Views.MeetingActivity(meeting, now, _keys));
-            if (meeting.Start <= now && now - meeting.Start < TimeSpan.FromMinutes(1) && _announced.Add(meeting.Ref))
-            {
-                await ShowHudAsync(Glyphs.Calendar, $"{Format.Clip(meeting.Subject, 80)} beginnt jetzt");
-            }
+            await ShowHudAsync(Glyphs.Calendar, $"{Format.Clip(meeting.Subject, 80)} beginnt jetzt");
         }
         if (_announced.Count > 100)
         {
             _announced.Clear();
-        }
-
-        if (snapshot.UnreadCount > 0)
-        {
-            await SetActivityAsync(Views.MailActivity(snapshot, now, Settings.ShowUnreadInNotch));
-        }
-        else
-        {
-            await EndActivityAsync("mail");
-        }
-
-        if (Views.TasksActivity(snapshot, now) is { } tasks)
-        {
-            await SetActivityAsync(tasks);
-        }
-        else
-        {
-            await EndActivityAsync("tasks");
         }
 
         _keys.Trim(snapshot.Mails.Select(m => m.Ref).Concat(snapshot.Meetings.Select(m => m.Ref)).Concat(snapshot.Tasks.Select(t => t.Ref)));
@@ -292,20 +247,6 @@ public sealed class OutlookPlugin
 
     // ───────── An Brim, nur bei Änderungen ─────────
 
-    private Task SetViewAsync(string id, Widget content, int order)
-    {
-        var json = JsonSerializer.Serialize(content, PluginJson.Options) + order;
-        if (_views.TryGetValue(id, out var sent) && sent == json)
-        {
-            return Task.CompletedTask;
-        }
-        _views[id] = json;
-        return SendAsync(() => _sink.SetViewAsync(id, content, order));
-    }
-
-    private Task ClearViewAsync(string id) =>
-        _views.Remove(id) ? SendAsync(() => _sink.ClearViewAsync(id)) : Task.CompletedTask;
-
     private Task SetActivityAsync(ActivityParams activity)
     {
         var json = JsonSerializer.Serialize(activity, PluginJson.Options);
@@ -316,9 +257,6 @@ public sealed class OutlookPlugin
         _activities[activity.Id] = json;
         return SendAsync(() => _sink.SetActivityAsync(activity));
     }
-
-    private Task EndActivityAsync(string id) =>
-        _activities.Remove(id) ? SendAsync(() => _sink.EndActivityAsync(id)) : Task.CompletedTask;
 
     private Task ShowHudAsync(string glyph, string text) =>
         SendAsync(() => _sink.ShowHudAsync(new HudParams { Glyph = glyph, Text = text, Announcement = text }));

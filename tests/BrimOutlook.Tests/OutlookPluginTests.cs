@@ -26,6 +26,13 @@ public class OutlookPluginTests
 
     private DateTime Now => _time.GetLocalNow().DateTime;
 
+    private ActivityParams Outlook => _sink.Activities["outlook"];
+
+    /// <summary>Abschnitte der Liste im Tab „Jetzt“.</summary>
+    private IReadOnlyList<Brim.Core.Widgets.Widget> Sections => ((Brim.Core.Widgets.ListWidget)Outlook.Expanded!).Items;
+
+    private IEnumerable<string> Texts => WidgetTree.Texts(Outlook.Expanded!);
+
     private static MailSummary Mail(string id, DateTime received, string sender = "Anna", string subject = "Angebot") =>
         new(new ItemRef(id), sender, subject, received, false);
 
@@ -33,7 +40,7 @@ public class OutlookPluginTests
         new(new ItemRef(id), "Teamrunde", start, start.AddMinutes(30), "Raum 1", false, link);
 
     [Fact]
-    public async Task ShowsCardsForMailCalendarAndTasks()
+    public async Task ShowsEverythingScrollableInNow()
     {
         _outlook.Snapshot = new OutlookSnapshot(
             7,
@@ -43,16 +50,19 @@ public class OutlookPluginTests
 
         await _plugin.RefreshAsync();
 
-        Assert.Equal(["calendar", "mail", "tasks"], _sink.Views.Keys.Order());
-        Assert.Contains("Angebot", WidgetTree.Texts(_sink.Views["mail"]));
-        Assert.Contains("und 6 weitere", WidgetTree.Texts(_sink.Views["mail"]));
-        Assert.Contains("11:00–11:30", WidgetTree.Texts(_sink.Views["calendar"]));
-        Assert.Contains("seit gestern überfällig", WidgetTree.Texts(_sink.Views["tasks"]));
+        // Eine Aktivität mit höchstem Plugin-Rang; im Tab „Jetzt“ eine scrollbare Liste, nichts im Tab „Plugins“.
+        Assert.Equal(["outlook"], _sink.Activities.Keys);
+        Assert.Empty(_sink.Views);
+        Assert.Equal(9, Outlook.Rank);
+        Assert.True(((Brim.Core.Widgets.ListWidget)Outlook.Expanded!).Scrollable);
+        Assert.Equal(3, Sections.Count);
+        Assert.Contains("11:00–11:30", WidgetTree.Texts(Sections[0]));
+        Assert.Contains("Angebot", WidgetTree.Texts(Sections[1]));
+        Assert.Contains("und 6 weitere", WidgetTree.Texts(Sections[1]));
+        Assert.Contains("seit gestern überfällig", WidgetTree.Texts(Sections[2]));
 
-        // Ungelesene nur im Tab „Jetzt“, fällige Aufgaben ebenso; der Termin ist noch zu weit weg.
-        Assert.True(_sink.Activities["mail"].Background);
-        Assert.True(_sink.Activities["tasks"].Background);
-        Assert.False(_sink.Activities.ContainsKey("meeting"));
+        // Der Termin ist noch zu weit weg: kompakt bleibt die Notch frei.
+        Assert.True(Outlook.Background);
     }
 
     [Fact]
@@ -62,14 +72,15 @@ public class OutlookPluginTests
         _outlook.Snapshot = new OutlookSnapshot(0, [], [Meeting("c1", Start.AddMinutes(20), link)], []);
 
         await _plugin.RefreshAsync();
-        Assert.False(_sink.Activities.ContainsKey("meeting"));
+        Assert.True(Outlook.Background);
 
         _time.Advance(TimeSpan.FromMinutes(8));
         await _plugin.RenderAsync();
-        var activity = _sink.Activities["meeting"];
-        Assert.Equal("in 12 min", ((Brim.Core.Widgets.TextWidget)activity.Trailing!).Text);
+        Assert.False(Outlook.Background);
+        Assert.Equal("in 12 min", ((Brim.Core.Widgets.TextWidget)Outlook.Trailing!).Text);
+        Assert.Equal(4, Sections.Count); // Termin groß obenauf
 
-        var join = WidgetTree.Actions(activity.Expanded!).Single(a => a.StartsWith("join:"));
+        var join = WidgetTree.Actions(Sections[0]).Single(a => a.StartsWith("join:"));
         await _plugin.HandleActionAsync(join);
         Assert.Equal([link], _opened);
 
@@ -80,7 +91,8 @@ public class OutlookPluginTests
         // Fünf Minuten nach Beginn verschwindet er aus der Notch.
         _time.Advance(TimeSpan.FromMinutes(6));
         await _plugin.RenderAsync();
-        Assert.False(_sink.Activities.ContainsKey("meeting"));
+        Assert.True(Outlook.Background);
+        Assert.Equal(3, Sections.Count);
     }
 
     [Fact]
@@ -122,7 +134,7 @@ public class OutlookPluginTests
         _outlook.Snapshot = new OutlookSnapshot(1, [Mail("m1", Start)], [], [new TaskSummary(new ItemRef("t1"), "Bericht", null, false)]);
         await _plugin.RefreshAsync();
 
-        foreach (var action in WidgetTree.Actions(_sink.Views["mail"]).Concat(WidgetTree.Actions(_sink.Views["tasks"])))
+        foreach (var action in WidgetTree.Actions(Sections[1]).Concat(WidgetTree.Actions(Sections[2])))
         {
             await _plugin.HandleActionAsync(action);
         }
@@ -139,13 +151,22 @@ public class OutlookPluginTests
 
         _outlook.Unavailable = "Outlook läuft nicht.";
         await _plugin.RefreshAsync();
-        Assert.Equal(["outlook"], _sink.Views.Keys);
-        Assert.Empty(_sink.Activities);
-        Assert.Contains("launch", WidgetTree.Actions(_sink.Views["outlook"]));
+        Assert.True(Outlook.Background);
+        Assert.Contains("Outlook läuft nicht.", Texts);
+        Assert.Contains("launch", WidgetTree.Actions(Outlook.Expanded!));
 
         _outlook.Unavailable = null;
         await _plugin.RefreshAsync();
-        Assert.Equal(["calendar", "mail", "tasks"], _sink.Views.Keys.Order());
+        Assert.Equal(3, Sections.Count);
+    }
+
+    [Fact]
+    public async Task UnreadInCompactNotchOnRequest()
+    {
+        _outlook.Snapshot = new OutlookSnapshot(4, [Mail("m1", Start)], [], []);
+        await _plugin.ApplySettingsAsync(new PluginSettings { ShowUnreadInNotch = true });
+        Assert.False(Outlook.Background);
+        Assert.Equal("4", ((Brim.Core.Widgets.TextWidget)Outlook.Trailing!).Text);
     }
 
     [Fact]
@@ -153,10 +174,10 @@ public class OutlookPluginTests
     {
         _outlook.Snapshot = new OutlookSnapshot(1, [Mail("m1", Start)], [Meeting("c1", Start.AddHours(3))], []);
         await _plugin.RefreshAsync();
-        var sets = _sink.ViewSets;
+        var sets = _sink.ActivitySets;
 
         await _plugin.RenderAsync();
         await _plugin.RefreshAsync();
-        Assert.Equal(sets, _sink.ViewSets);
+        Assert.Equal(sets, _sink.ActivitySets);
     }
 }

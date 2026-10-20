@@ -33,10 +33,11 @@ internal sealed class RecordingSink : INotchSink
     public Dictionary<string, Widget> Views { get; } = [];
     public Dictionary<string, ActivityParams> Activities { get; } = [];
     public List<string> Huds { get; } = [];
-    public int ViewSets { get; private set; }
+    public int ActivitySets { get; private set; }
 
     public Task SetActivityAsync(ActivityParams activity)
     {
+        ActivitySets++;
         Activities[activity.Id] = activity;
         return Task.CompletedTask;
     }
@@ -55,7 +56,6 @@ internal sealed class RecordingSink : INotchSink
 
     public Task SetViewAsync(string id, Widget content, int order)
     {
-        ViewSets++;
         Views[id] = content;
         return Task.CompletedTask;
     }

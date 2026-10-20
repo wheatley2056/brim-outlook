@@ -1,16 +1,16 @@
 {
   "id": "de.brim.outlook",
   "name": "Outlook",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "entry": "BrimOutlook.exe",
   "api": "1",
-  "slots": ["compact.leading", "compact.trailing", "hud", "expanded.tab"],
+  "slots": ["compact.leading", "compact.trailing", "hud"],
   "permissions": ["notifications"],
   "notificationApps": ["Outlook"],
   "settings": [
     { "key": "refreshSeconds", "type": "number", "label": "Outlook abfragen alle … Sekunden", "default": 30 },
     { "key": "meetingLeadMinutes", "type": "number", "label": "Termin so viele Minuten vorher in der Notch zeigen", "default": 15 },
-    { "key": "maxItems", "type": "number", "label": "Einträge pro Karte", "default": 5 },
+    { "key": "maxItems", "type": "number", "label": "Einträge pro Abschnitt", "default": 10 },
     { "key": "showUnreadInNotch", "type": "bool", "label": "Ungelesene E-Mails kompakt in der Notch zeigen", "default": false },
     { "key": "mailHud", "type": "bool", "label": "Neue E-Mails kurz anzeigen", "default": true },
     { "key": "meetingActivity", "type": "bool", "label": "Nächsten Termin mit Countdown in der Notch zeigen", "default": true }
