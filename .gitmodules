@@ -1,0 +1,3 @@
+[submodule "external/brim"]
+	path = external/brim
+	url = https://github.com/wheatley2056/brim.git

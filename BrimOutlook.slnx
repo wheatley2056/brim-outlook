@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BrimOutlook/BrimOutlook.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BrimOutlook.Tests/BrimOutlook.Tests.csproj" />
+  </Folder>
+  <Folder Name="/external/">
+    <Project Path="external/brim/src/Brim.Core/Brim.Core.csproj" />
+    <Project Path="external/brim/src/Brim.Sdk/Brim.Sdk.csproj" />
+  </Folder>
+</Solution>
