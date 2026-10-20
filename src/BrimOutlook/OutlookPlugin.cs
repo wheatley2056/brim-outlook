@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Brim.Core;
 using Brim.Core.Plugins;
 using Brim.Core.Widgets;
 using BrimOutlook.Outlook;
@@ -22,6 +23,8 @@ public sealed class OutlookPlugin
     private readonly ActionKeys _keys = new();
     private readonly Dictionary<string, string> _activities = [];
     private readonly HashSet<ItemRef> _announced = [];
+    private readonly Dictionary<(string, TileSize), string> _widgets = [];
+    private IReadOnlyDictionary<string, IReadOnlyList<TileSize>> _placed = new Dictionary<string, IReadOnlyList<TileSize>>();
 
     private OutlookSnapshot? _snapshot;
     private string? _unavailable;
@@ -179,6 +182,13 @@ public sealed class OutlookPlugin
         }
     }
 
+    /// <summary>Brim meldet, welche Widgets auf „Jetzt“ liegen: gleich zeichnen.</summary>
+    public Task SetPlacedWidgetsAsync(IReadOnlyDictionary<string, IReadOnlyList<TileSize>> placed)
+    {
+        _placed = placed;
+        return RenderAsync();
+    }
+
     /// <summary>Zeichnet mit dem letzten Stand neu (Countdown, Termin beginnt).</summary>
     public async Task RenderAsync()
     {
@@ -195,6 +205,16 @@ public sealed class OutlookPlugin
 
     private async Task RenderLockedAsync(DateTime now)
     {
+        foreach (var (id, sizes) in _placed)
+        {
+            foreach (var size in sizes)
+            {
+                if (Widgets.Build(id, size, _snapshot, _unavailable, now, _keys) is { } widget)
+                {
+                    await SetWidgetAsync(id, size, widget);
+                }
+            }
+        }
         if (_unavailable is not null)
         {
             await SetActivityAsync(Views.UnavailableActivity(_unavailable));
@@ -256,6 +276,17 @@ public sealed class OutlookPlugin
         }
         _activities[activity.Id] = json;
         return SendAsync(() => _sink.SetActivityAsync(activity));
+    }
+
+    private Task SetWidgetAsync(string id, TileSize size, Widget content)
+    {
+        var json = JsonSerializer.Serialize(content, PluginJson.Options);
+        if (_widgets.TryGetValue((id, size), out var sent) && sent == json)
+        {
+            return Task.CompletedTask;
+        }
+        _widgets[(id, size)] = json;
+        return SendAsync(() => _sink.SetWidgetAsync(id, size, content));
     }
 
     private Task ShowHudAsync(string glyph, string text) =>

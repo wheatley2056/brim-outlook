@@ -1,12 +1,17 @@
 {
   "id": "de.brim.outlook",
   "name": "Outlook",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "entry": "BrimOutlook.exe",
   "api": "1",
   "slots": ["compact.leading", "compact.trailing", "hud"],
   "permissions": ["notifications"],
   "notificationApps": ["Outlook"],
+  "widgets": [
+    { "id": "meeting", "name": "Nächster Termin", "description": "Mit Countdown und Beitreten; groß mit den folgenden", "glyph": "\uE787", "sizes": ["medium", "small", "large"] },
+    { "id": "inbox", "name": "Posteingang", "description": "Ungelesene E-Mails", "glyph": "\uE715", "sizes": ["medium", "small", "large"] },
+    { "id": "tasks", "name": "Aufgaben", "description": "Offene Aufgaben zum Abhaken", "glyph": "\uE9D5", "sizes": ["medium", "large"] }
+  ],
   "settings": [
     { "key": "refreshSeconds", "type": "number", "label": "Outlook abfragen alle … Sekunden", "default": 30 },
     { "key": "meetingLeadMinutes", "type": "number", "label": "Termin so viele Minuten vorher in der Notch zeigen", "default": 15 },

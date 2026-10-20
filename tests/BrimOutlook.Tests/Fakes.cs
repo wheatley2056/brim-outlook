@@ -67,6 +67,16 @@ internal sealed class RecordingSink : INotchSink
     }
 
     public Task LogAsync(string message, string level) => Task.CompletedTask;
+
+    public Dictionary<(string Id, Brim.Core.TileSize Size), Widget> Widgets { get; } = [];
+    public int WidgetSets { get; private set; }
+
+    public Task SetWidgetAsync(string id, Brim.Core.TileSize size, Widget content)
+    {
+        WidgetSets++;
+        Widgets[(id, size)] = content;
+        return Task.CompletedTask;
+    }
 }
 
 internal static class WidgetTree

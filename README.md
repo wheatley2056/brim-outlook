@@ -7,6 +7,7 @@ Plugin für [Brim](https://github.com/wheatley2056/brim), die Notch für Windows
 | **Tab „Jetzt“** | Alles in einer scrollbaren Liste: der anstehende Termin groß mit **Beitreten** (Teams, Zoom, Google Meet, Webex), dann **Heute** (bzw. **Morgen**, wenn heute nichts mehr ansteht), **Posteingang** und **Aufgaben**. Jeweils öffnen, neu anlegen, als gelesen bzw. erledigt markieren, Ordner in Outlook zeigen. |
 | **Notch, kompakt** | Der nächste Termin erscheint 15 Minuten vorher mit Countdown („in 12 min“) und bleibt bis 5 Minuten nach Beginn. Zu Beginn kurz als HUD: „Teamrunde beginnt jetzt“. Sonst bleibt die kompakte Notch frei. |
 | **HUD** | Neue E-Mail: „Anna Müller: Angebot Q4“. |
+| **Widgets auf „Jetzt“** (Brim 1.2) | **Nächster Termin** (klein, mittel, groß – groß mit den folgenden), **Posteingang** (klein mit Anzahl, mittel, groß mit den neuesten) und **Aufgaben** (mittel, groß, zum Abhaken). Hinzufügen: „Jetzt“ lange drücken oder rechts anklicken, dann „+“. |
 
 Brim zeigt im Tab „Jetzt“ die laufende Aktivität mit dem höchsten Rang. Das Plugin nimmt den höchsten, den Brim Plugins erlaubt (9), und steht damit vor Akku, Kamera und pausierter Musik. **Läuft Musik oder ein Timer, zeigt „Jetzt“ diese**, bis sie pausiert bzw. abgelaufen sind.
 
