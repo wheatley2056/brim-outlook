@@ -180,4 +180,57 @@ public class OutlookPluginTests
         await _plugin.RefreshAsync();
         Assert.Equal(sets, _sink.ActivitySets);
     }
+
+    [Fact]
+    public async Task WidgetsOnlyForPlacedSizesAndOnlyWhenChanged()
+    {
+        var link = new Uri("https://teams.microsoft.com/l/meetup-join/19%3aabc/0");
+        _outlook.Snapshot = new OutlookSnapshot(3, [Mail("m1", Start.AddMinutes(-5))], [Meeting("c1", Start.AddMinutes(20), link)], []);
+        await _plugin.RefreshAsync();
+        Assert.Empty(_sink.Widgets);
+
+        await _plugin.SetPlacedWidgetsAsync(new Dictionary<string, IReadOnlyList<Brim.Core.TileSize>>
+        {
+            ["meeting"] = [Brim.Core.TileSize.Medium],
+            ["inbox"] = [Brim.Core.TileSize.Small, Brim.Core.TileSize.Large],
+        });
+        Assert.Equal(3, _sink.Widgets.Count);
+        Assert.Contains("Teamrunde", WidgetTree.Texts(_sink.Widgets[("meeting", Brim.Core.TileSize.Medium)]));
+        Assert.Contains(WidgetTree.Actions(_sink.Widgets[("meeting", Brim.Core.TileSize.Medium)]), a => a.StartsWith("join:"));
+        Assert.Contains("3", WidgetTree.Texts(_sink.Widgets[("inbox", Brim.Core.TileSize.Small)]));
+        Assert.Contains("Angebot", WidgetTree.Texts(_sink.Widgets[("inbox", Brim.Core.TileSize.Large)]));
+
+        // Nichts geändert: nichts geschickt.
+        var sets = _sink.WidgetSets;
+        await _plugin.RenderAsync();
+        Assert.Equal(sets, _sink.WidgetSets);
+
+        // Outlook weg: die Widgets sagen es und bieten „Starten“.
+        _outlook.Unavailable = "Outlook läuft nicht";
+        await _plugin.RefreshAsync();
+        Assert.Contains("launch", WidgetTree.Actions(_sink.Widgets[("meeting", Brim.Core.TileSize.Medium)]));
+    }
+
+    [Fact]
+    public void EveryWidgetIsValidInEverySize()
+    {
+        var snapshot = new OutlookSnapshot(
+            7,
+            [Mail("m1", Start.AddMinutes(-5)), Mail("m2", Start.AddHours(-1))],
+            [Meeting("c1", Start.AddMinutes(10)), Meeting("c2", Start.AddHours(3))],
+            [new TaskSummary(new ItemRef("t1"), "Bericht", Start.Date, true)]);
+        var keys = new ActionKeys();
+        foreach (var id in new[] { Widgets.Meeting, Widgets.Inbox, Widgets.Tasks })
+        {
+            foreach (var size in Enum.GetValues<Brim.Core.TileSize>())
+            {
+                foreach (var state in new[] { snapshot, new OutlookSnapshot(0, [], [], []), null })
+                {
+                    var widget = Widgets.Build(id, size, state, "Outlook läuft nicht", Start, keys);
+                    Assert.NotNull(widget);
+                    Assert.Null(Brim.Core.Widgets.WidgetValidator.Validate(widget!));
+                }
+            }
+        }
+    }
 }

@@ -1,3 +1,4 @@
+using Brim.Core;
 using Brim.Core.Plugins;
 using Brim.Core.Widgets;
 using Brim.Sdk;
@@ -13,6 +14,7 @@ public interface INotchSink
     Task SetViewAsync(string id, Widget content, int order);
     Task ClearViewAsync(string id);
     Task LogAsync(string message, string level);
+    Task SetWidgetAsync(string id, TileSize size, Widget content);
 }
 
 internal sealed class BrimSink(BrimPlugin brim) : INotchSink
@@ -23,4 +25,5 @@ internal sealed class BrimSink(BrimPlugin brim) : INotchSink
     public Task SetViewAsync(string id, Widget content, int order) => brim.SetViewAsync(id, content, order);
     public Task ClearViewAsync(string id) => brim.ClearViewAsync(id);
     public Task LogAsync(string message, string level) => brim.LogAsync(message, level);
+    public Task SetWidgetAsync(string id, TileSize size, Widget content) => brim.SetWidgetAsync(id, size, content);
 }

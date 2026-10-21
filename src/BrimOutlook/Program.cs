@@ -25,6 +25,8 @@ brim.TabVisibilityChanged += visible =>
     }
 };
 brim.NotificationPosted += notification => _ = plugin.OnNotificationAsync(notification);
+brim.WidgetsPlaced += placed => _ = plugin.SetPlacedWidgetsAsync(placed);
+_ = plugin.SetPlacedWidgetsAsync(brim.PlacedWidgets);
 
 using var stop = new CancellationTokenSource();
 var loop = plugin.RunAsync(stop.Token);
