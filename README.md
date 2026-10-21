@@ -22,15 +22,23 @@ Läuft Outlook nicht, steht das im Tab „Jetzt“, mit **Outlook starten**.
 
 ## Installieren
 
+Am einfachsten über die Plugin-Bibliothek ab Brim 2.3: Einstellungen → Plugins → Bibliothek → **Outlook** → Installieren.
+
+Von Hand aus dem Quellcode:
+
 ```powershell
 git clone --recurse-submodules https://github.com/wheatley2056/brim-outlook.git
 cd brim-outlook
 dotnet publish src/BrimOutlook -c Release -r win-x64 --self-contained false -o "$env:LOCALAPPDATA\Brim\Plugins\outlook"
 ```
 
-Brim neu starten, Notch aufklappen, Tab **Plugins**: rechts **Outlook** einschalten.
+Danach Brim neu starten, Notch aufklappen, Tab **Plugins**: rechts **Outlook** einschalten.
 
 Das Plugin bittet um das Recht **„Benachrichtigungen bestimmter Apps lesen“** für Outlook. Damit gehen Outlooks eigene Windows-Benachrichtigungen (neue E-Mail, Erinnerungen) an das Plugin statt an Brims Vorschau und erscheinen als ein HUD statt doppelt. Dafür muss Brims Identität eingerichtet sein (Einstellungen → Kalender und Benachrichtigungen); ohne sie meldet das Plugin neue E-Mails selbst.
+
+## Release
+
+Tag `v<Version>` setzen, passend zu `version` in `src/BrimOutlook/plugin.json`. Die Action hängt dann `brim-outlook.zip` an das Release. Danach im Brim-Repository `./build/catalog/Add-Plugin.ps1 -Repository wheatley2056/brim-outlook -Tag v<Version>` ausführen und den Katalog per Pull Request aktualisieren.
 
 Ausgaben stehen in `%LocalAppData%\Brim\logs\plugins\de.brim.outlook.log`.
 
